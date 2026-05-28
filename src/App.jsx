@@ -44,142 +44,125 @@ const AGENT_STAGES = [
 
 // ─── API Layer ────────────────────────────────────────────────────────────────
 
-async function callGoogleTranslate(
+async function callOpenRouter(
   text,
   sourceLang,
-  targetLang
+  targetLang,
+  mode = "standard"
 ) {
-  const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+  const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
 
   const response = await fetch(
-    `https://translation.googleapis.com/language/translate/v2?key=${apiKey}`,
+    "https://openrouter.ai/api/v1/chat/completions",
     {
       method: "POST",
       headers: {
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        q: text,
-        source: sourceLang === "auto" ? undefined : sourceLang,
-        target: targetLang,
-        format: "text"
+        model: "openai/gpt-oss-20b:free",
+        max_tokens: 120,
+        temperature: 0.1,
+        messages: [
+          {
+            role: "system",
+            content: `
+Translate from ${sourceLang} to ${targetLang}.
+
+Mode: ${mode}
+
+Return ONLY valid JSON:
+{
+  "translation": "...",
+  "confidence": 0.95
+}
+`
+          },
+          {
+            role: "user",
+            content: text
+          }
+        ]
       })
     }
   );
 
   const data = await response.json();
 
-  return {
-    translation: data.data.translations[0].translatedText,
-    transliteration: null,
-    pronunciation: null,
-    confidence: 0.97,
-    alternatives: [],
-    detected_language:
-      data.data.translations[0].detectedSourceLanguage || sourceLang,
-    tone: "general",
-    domain: "general",
-    nuances: null,
-    agent_reasoning: "Translated using Google Translate API."
-  };
-}
+  if (!data.choices || !data.choices[0]) {
+    throw new Error(data.error?.message || "OpenRouter API error");
+  }
 
-// ─── Agent Orchestration ─────────────────────────────────────────────────────
-
-async function runTranslationAgents(
-  text, sourceLang, targetLang, mode, context, onStageUpdate, onChunk
-) {
-  const sourceName = LANGUAGES.find(l => l.code === sourceLang)?.name || sourceLang;
-  const targetName = LANGUAGES.find(l => l.code === targetLang)?.name || targetLang;
-
-  // Stage 1: Detection + Context
-  onStageUpdate("detect", "running");
-  await new Promise(r => setTimeout(r, 400));
-  onStageUpdate("detect", "done");
-  onStageUpdate("context", "running");
-  await new Promise(r => setTimeout(r, 300));
-  onStageUpdate("context", "done");
-
-  // Stage 2: Translation
-  onStageUpdate("translate", "running");
-
-  const systemPrompt = `You are PolyLang AI — an elite autonomous multilingual translation system.
-
-Your architecture consists of specialized agents:
-1. Language Detection Agent — identifies source language, handles code-switching
-2. Context Understanding Agent — infers tone, domain, sentiment, ambiguity
-3. Translation Generation Agent — produces semantically accurate translations
-4. Validation Agent — checks grammar, semantic similarity, hallucinaton detection
-5. Memory Agent — leverages conversation history for consistency
-
-Translation mode: ${mode}
-Source language: ${sourceName}
-Target language: ${targetName}
-${context ? `Conversation context: ${context}` : ""}
-
-Respond ONLY with a JSON object (no markdown fences) with these fields:
-{
-  "translation": "the main translated text",
-  "transliteration": "romanized/phonetic version if applicable, else null",
-  "pronunciation": "pronunciation guide if useful, else null",
-  "confidence": number between 0.85 and 1.0,
-  "alternatives": ["alt1", "alt2"],
-  "detected_language": "detected source language name",
-  "tone": "detected tone (formal/casual/technical/literary)",
-  "domain": "detected domain (general/medical/legal/tech/etc)",
-  "nuances": "brief note on cultural/contextual nuances, max 1 sentence",
-  "agent_reasoning": "1 sentence on how the AI reasoned about the translation"
-}`;
-
-  let rawResult = "";
-  await callClaudeAPI(
-    [{ role: "user", content: `Translate this text:\n\n"${text}"` }],
-    systemPrompt,
-    (partial) => {
-      rawResult = partial;
-      onChunk && onChunk(partial);
-    }
-  );
-
-  onStageUpdate("translate", "done");
-  onStageUpdate("validate", "running");
-  await new Promise(r => setTimeout(r, 350));
-  onStageUpdate("validate", "done");
-  onStageUpdate("refine", "running");
-  await new Promise(r => setTimeout(r, 250));
-  onStageUpdate("refine", "done");
-
+  const content = data.choices[0].message.content;
   try {
-    const clean = rawResult.replace(/```json|```/g, "").trim();
-    return JSON.parse(clean);
+    return JSON.parse(content);
   } catch {
     return {
-      translation: rawResult,
+      translation: content,
       transliteration: null,
       pronunciation: null,
-      confidence: 0.92,
+      confidence: 0.90,
       alternatives: [],
-      detected_language: sourceName,
+      detected_language: sourceLang,
       tone: "general",
       domain: "general",
       nuances: null,
-      agent_reasoning: "Direct translation applied.",
+      agent_reasoning: "Generated using OpenRouter."
     };
   }
 }
 
-async function runConversationalAgent(message, history, sourceLang, targetLang, onChunk) {
-  const targetName = LANGUAGES.find(l => l.code === targetLang)?.name || targetLang;
-  const system = `You are PolyLang AI, an expert multilingual translation assistant. 
-You help users with translations, explanations of linguistic nuances, etymology, cultural context, and language learning.
-Current target language: ${targetName}. 
-Be concise, insightful, and conversational. Use markdown for formatting when helpful.`;
 
-  const msgs = [
-    ...history.map(h => ({ role: h.role, content: h.content })),
-    { role: "user", content: message },
-  ];
-  return callClaudeAPI(msgs, system, onChunk);
+async function runConversationalAgent(
+  message,
+  history,
+  sourceLang,
+  targetLang,
+  onChunk
+) {
+  const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+
+  const response = await fetch(
+    "https://openrouter.ai/api/v1/chat/completions",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "openai/gpt-oss-20b:free",
+        max_tokens: 120,
+        temperature: 0.1,
+        messages: [
+          {
+            role: "system",
+            content:
+  "You are PolyLang AI, a multilingual AI assistant helping users with translations, grammar, language learning, and conversations."
+          },
+          ...history,
+          {
+            role: "user",
+            content: message
+          }
+        ]
+      })
+    }
+  );
+
+  const data = await response.json();
+  if (!data.choices || !data.choices[0]) {
+    throw new Error(data.error?.message || "OpenRouter API error");
+  }
+  
+  const content = data.choices[0].message.content;
+
+  if (onChunk) {
+    onChunk(content);
+  }
+
+  return content;
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -829,39 +812,81 @@ export default function PolyLangAI() {
   }, []);
 
   const handleTranslate = async () => {
-    if (!sourceText.trim()) return;
-    setIsTranslating(true);
-    setResult(null);
-    setStreamingText("");
-    setError("");
-    setAgentStages({});
-    setShowPipeline(settings.showPipeline !== false);
+  if (!sourceText.trim() || isTranslating) return;
 
-    try {
-      const res = await callGoogleTranslate(
-  sourceText,
-  sourceLang,
-  targetLang
-);
-      setResult(res);
-      setStreamingText("");
+  setIsTranslating(true);
+  setResult(null);
+  setStreamingText("");
+  setError("");
+  setAgentStages({});
+  setShowPipeline(settings.showPipeline !== false);
 
-      const entry = {
-        sourceText, sourceLang, targetLang,
-        sourceLangName: sourceLangObj?.name,
-        targetLangName: targetLangObj?.name,
-        translation: res.translation,
-        confidence: res.confidence,
-        mode,
-        timestamp: Date.now(),
-      };
-      setHistory(prev => [...prev, entry]);
-    } catch (e) {
-      setError("Translation failed. Please check your connection and try again.");
-    } finally {
-      setIsTranslating(false);
+  try {
+    // ─── Simulated Agent Pipeline ─────────────────────
+    if (settings.showPipeline !== false) {
+      updateStage("detect", "running");
+      await new Promise(r => setTimeout(r, 300));
+      updateStage("detect", "done");
+
+      updateStage("context", "running");
+      await new Promise(r => setTimeout(r, 300));
+      updateStage("context", "done");
+
+      updateStage("translate", "running");
     }
-  };
+
+    // ─── Main Translation Request ────────────────────
+    const res = await callOpenRouter(
+      sourceText,
+      sourceLang,
+      targetLang,
+      mode
+    );
+
+    // ─── Finish Pipeline ─────────────────────────────
+    if (settings.showPipeline !== false) {
+      updateStage("translate", "done");
+
+      updateStage("validate", "running");
+      await new Promise(r => setTimeout(r, 200));
+      updateStage("validate", "done");
+
+      updateStage("refine", "running");
+      await new Promise(r => setTimeout(r, 200));
+      updateStage("refine", "done");
+    }
+
+    // ─── Save Result ─────────────────────────────────
+    setResult(res);
+    setStreamingText("");
+
+    const entry = {
+      sourceText,
+      sourceLang,
+      targetLang,
+      sourceLangName: sourceLangObj?.name,
+      targetLangName: targetLangObj?.name,
+      translation: res.translation,
+      confidence: res.confidence,
+      mode,
+      timestamp: Date.now(),
+    };
+
+    setHistory(prev => [...prev, entry]);
+
+  } catch (e) {
+    console.error(e);
+
+    setError(
+      e.message ||
+      "Translation failed. Please check your API key or internet connection."
+    );
+
+    setAgentStages({});
+  } finally {
+    setIsTranslating(false);
+  }
+};
 
   const handleSwap = () => {
     if (sourceLang === "auto") return;
