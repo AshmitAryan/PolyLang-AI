@@ -62,7 +62,7 @@ async function callOpenRouter(
       },
       body: JSON.stringify({
         model: "openai/gpt-oss-20b:free",
-        max_tokens: 120,
+        max_tokens: 180,
         temperature: 0.1,
         messages: [
           {
@@ -72,9 +72,15 @@ Translate from ${sourceLang} to ${targetLang}.
 
 Mode: ${mode}
 
-Return ONLY valid JSON:
+Return raw JSON only.
+Do not use markdown.
+Do not use code blocks.
+
 {
   "translation": "...",
+  "transliteration": "...",
+  "pronunciation": "...",
+  "alternatives": ["...", "..."],
   "confidence": 0.95
 }
 `
@@ -91,19 +97,29 @@ Return ONLY valid JSON:
   const data = await response.json();
 
   if (!data.choices || !data.choices[0]) {
-    throw new Error(data.error?.message || "OpenRouter API error");
+    throw new Error(
+      data.error?.message || "OpenRouter API error"
+    );
   }
 
   const content = data.choices[0].message.content;
+
+  const cleaned = content
+    .replace(/```json/g, "")
+    .replace(/```/g, "")
+    .trim();
+
   try {
-    return JSON.parse(content);
+    return JSON.parse(cleaned);
   } catch {
+    console.log("RAW MODEL OUTPUT:", content);
+
     return {
-      translation: content,
+      translation: cleaned,
       transliteration: null,
       pronunciation: null,
-      confidence: 0.90,
       alternatives: [],
+      confidence: 0.90,
       detected_language: sourceLang,
       tone: "general",
       domain: "general",
@@ -151,12 +167,13 @@ async function runConversationalAgent(
     }
   );
 
-  const data = await response.json();
-  if (!data.choices || !data.choices[0]) {
-    throw new Error(data.error?.message || "OpenRouter API error");
-  }
-  
-  const content = data.choices[0].message.content;
+const data = await response.json();
+
+if (!data.choices || !data.choices[0]) {
+  throw new Error(data.error?.message || "OpenRouter API error");
+}
+
+const content = data.choices[0].message.content;
 
   if (onChunk) {
     onChunk(content);
