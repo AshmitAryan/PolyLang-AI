@@ -1,6 +1,6 @@
 # PolyLang AI
 
-![Banner](./assets/banner.png)
+![Banner](./src/assets/banner.png)
 
 An advanced multilingual AI-powered translation platform with agentic workflows and conversational AI.
 
@@ -12,11 +12,11 @@ https://poly-lang-ai.vercel.app/
 
 ## Translation Studio
 
-![Translation Studio](./assets/home.png)
+![Translation Studio](./src/assets/home.png)
 
 ## AI Assistant
 
-![AI Assistant](./assets/chat.png)
+![AI Assistant](./src/assets/chat.png)
 
 ## Features
 
