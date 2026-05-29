@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-
+import ReactMarkdown from "react-markdown";
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const LANGUAGES = [
@@ -465,8 +465,8 @@ const css = `
   .history-target { font-size: 13px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
 
   /* Chat */
-  .chat-container { display: flex; flex-direction: column; height: 100%; gap: 16px; }
-  .chat-messages { flex: 1; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; padding-right: 4px; }
+  .chat-container { display: flex; flex-direction: column; height: calc(100vh - 120px);}
+  .chat-messages { flex: 1; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; padding-right: 4px; padding-bottom: 16px; }
   .chat-messages::-webkit-scrollbar { width: 3px; }
   .chat-messages::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 4px; }
 
@@ -483,13 +483,72 @@ const css = `
   .chat-avatar.assistant { background: linear-gradient(135deg, var(--accent), var(--purple)); color: white; }
 
   .chat-bubble {
+  .chat-bubble h1,
+.chat-bubble h2,
+.chat-bubble h3,
+.chat-bubble h4 {
+  margin: 10px 0 6px;
+  color: var(--text);
+}
+
+.chat-bubble p {
+  margin: 6px 0;
+  line-height: 1.7;
+}
+
+.chat-bubble ul,
+.chat-bubble ol {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+
+.chat-bubble li {
+  margin: 4px 0;
+}
+
+.chat-bubble code {
+  background: rgba(255,255,255,0.08);
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.chat-bubble pre {
+  background: #111318;
+  padding: 12px;
+  border-radius: 10px;
+  overflow-x: auto;
+  margin: 10px 0;
+  border: 1px solid var(--border);
+}
+
+.chat-bubble strong {
+  color: white;
+}
+
+.chat-bubble blockquote {
+  border-left: 3px solid var(--accent);
+  padding-left: 12px;
+  margin: 10px 0;
+  color: var(--text2);
+}
     padding: 10px 14px; border-radius: 12px; font-size: 14px; line-height: 1.6;
     max-width: 100%;
   }
   .chat-msg.user .chat-bubble { background: var(--accent); color: white; border-radius: 12px 4px 12px 12px; }
   .chat-msg.assistant .chat-bubble { background: var(--bg3); border: 1px solid var(--border); border-radius: 4px 12px 12px 12px; color: var(--text); }
 
-  .chat-input-row { display: flex; gap: 8px; align-items: flex-end; }
+  .chat-input-row { display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  position: sticky;
+  bottom: 0;
+  backdrop-filter: blur(12px);
+}
   .chat-input {
     flex: 1; background: var(--bg2); border: 1px solid var(--border);
     border-radius: 12px; padding: 10px 14px; font-family: var(--font);
@@ -662,13 +721,15 @@ function ChatPanel({ targetLang, onClose }) {
   };
 
   return (
-    <div className="chat-container" style={{ height: "calc(100vh - 160px)" }}>
+    <div className="chat-container">
       <div className="chat-messages">
         {messages.map((m, i) => (
           <div key={i} className={`chat-msg ${m.role} fade-in`}>
             <div className={`chat-avatar ${m.role}`}>{m.role === "user" ? "U" : "P"}</div>
             <div className="chat-bubble">
-              {m.content}
+              <ReactMarkdown>
+                {m.content}
+              </ReactMarkdown>
               {m.streaming && <span className="streaming-cursor" />}
             </div>
           </div>
