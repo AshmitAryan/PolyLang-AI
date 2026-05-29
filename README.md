@@ -1,10 +1,22 @@
 # PolyLang AI
 
-An advanced multilingual AI-powered translation platform built using React, Vite, and OpenRouter.
+![Banner](./assets/banner.png)
+
+An advanced multilingual AI-powered translation platform with agentic workflows and conversational AI.
 
 ## Live Demo
 
 https://poly-lang-ai.vercel.app/
+
+# Screenshots
+
+## Translation Studio
+
+![Translation Studio](./assets/home.png)
+
+## AI Assistant
+
+![AI Assistant](./assets/chat.png)
 
 ## Features
 
